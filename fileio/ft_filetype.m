@@ -648,7 +648,11 @@ elseif isdir(p) && exist(fullfile(p, 'header'), 'file') && exist(fullfile(p, 'sa
   type = 'fcdc_buffer_offline';
   manufacturer = 'Donders Centre for Cognitive Neuroimaging';
   content = 'FieldTrip buffer offline dataset';
-  
+
+elseif isdir(filename) && filetype_check_egi_mff_v3(filename),
+  type = 'egi_mff_v2';
+  manufacturer = 'Electrical Geodesics Incorporated';
+  content = 'raw EEG data';
 elseif isdir(filename) && exist(fullfile(filename, 'info.xml'), 'file') && exist(fullfile(filename, 'signal1.bin'), 'file')
   % this is an OS X package directory representing a complete EEG dataset
   % it contains a Content file, multiple xml files and one or more signalN.bin files
@@ -1411,6 +1415,30 @@ if haslfp || hasmua || hasspike
   
   res=any(ft_filetype(neuralynxdirs, 'neuralynx_ds'));
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SUBFUNCTION that checks whether the filename is an EGI MFF file, version 3
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function res = filetype_check_egi_mff_v3(filename)
+w = warning('off', 'all');
+cleanupObj = onCleanup(@() warning(w));
+res = false;
+if ~filetype_check_extension(filename, '.mff'),
+  return
+end
+
+if ~ft_hastoolbox('egi_mff', 3, 1),
+  return
+end
+
+try
+    mff_setup;
+    mff_valid(filename);
+catch
+  return
+end
+
+res = true;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SUBFUNCTION that checks whether the file contains only ascii characters
