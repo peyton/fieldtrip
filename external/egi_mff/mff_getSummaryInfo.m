@@ -45,83 +45,93 @@ mfffileObj = mff_getObject(com.egi.services.mff.api.MFFResourceType.kMFF_RT_MFFF
 %mfffileObj = javaObject('com.egi.services.mff.api.MFFFile', filePath, true);
 
 [pibBinObj pibBlocks pibFilename binObj blocks eegFilename] = getSignalBlocks(mfffileObj, filePath);
-numblocks = binObj.getNumberOfBlocks();
-if numblocks > 0 % Should always be
 
-    summaryInfo.javaObjs.mfffileObj = mfffileObj;
-    summaryInfo.javaObjs.binObj = binObj; % bin obj for the EEG data
-    summaryInfo.javaObjs.blocks = blocks; % block objects for the EEG bin obj
-    summaryInfo.eegFilename = eegFilename;
+assert(~(isempty(pibBinObj) && isempty(binObj)));
 
+summaryInfo.javaObjs.mfffileObj = mfffileObj;
+summaryInfo.javaObjs.binObj = binObj; % bin obj for the EEG data
+summaryInfo.javaObjs.blocks = blocks; % block objects for the EEG bin obj
+summaryInfo.nChans = 0;
+summaryInfo.eegFilename = '';
+
+summaryInfo.javaObjs.pibBinObj = pibBinObj; % bin obj for the PIB data
+summaryInfo.javaObjs.pibBlocks = pibBlocks; % block objects for the PIB bin obj
+summaryInfo.pibNChans = 0;
+summaryInfo.pibFilename = '';
+
+if ~isempty(binObj)
+    numblocks = binObj.getNumberOfBlocks();
     blockObj = blocks.get(0); %zero based
     sampRate = double(blockObj.signalFrequency(1)); % 1 based
     nChans = blockObj.numberOfSignals;
     summaryInfo.sampRate = sampRate;
     summaryInfo.nChans = nChans;
-
-    summaryInfo.javaObjs.pibBinObj = pibBinObj; % bin obj for the PIB data
-    summaryInfo.javaObjs.pibBlocks = pibBlocks; % block objects for the PIB bin obj
-    summaryInfo.pibNChans = 0;
-    summaryInfo.pibFilename = '';
-    if ~isempty(pibBinObj)
-        summaryInfo.pibFilename = pibFilename;
-        pnsSetObj = mff_getObject(com.egi.services.mff.api.MFFResourceType.kMFF_RT_PNSSet, 'pnsSet.xml', filePath);
-        pnsSensors = pnsSetObj.getPNSSensors;
-        summaryInfo.pibNChans = pnsSensors.size;
-        pibBlockObj = pibBlocks.get(0);
-%         summaryInfo.pibNChans = pibBlockObj.numberOfSignals;
-        summaryInfo.pibHasRef = false;
-%         if (summaryInfo.pibNChans == 7) && (pibBlockObj.numberOfSignals == 8)
-        if pibBlockObj.numberOfSignals - summaryInfo.pibNChans == 1
-           summaryInfo.pibHasRef = true;
-        end
-    end
     
-    [epochType epochBeginSamps epochNumSamps epochFirstBlocks epochLastBlocks epochLabels epochTime0 multiSubj epochSubjects epochFilenames epochSegStatus] = getEpochInfos(filePath, sampRate);
-    summaryInfo.epochType = epochType;
-    summaryInfo.epochBeginSamps = epochBeginSamps;
-    summaryInfo.epochNumSamps = epochNumSamps;
-    summaryInfo.epochFirstBlocks = epochFirstBlocks;
-    summaryInfo.epochLastBlocks = epochLastBlocks;
-    summaryInfo.epochLabels = epochLabels;
-    summaryInfo.epochTime0 = epochTime0;
-    summaryInfo.multiSubj = multiSubj;
-    summaryInfo.epochSubjects = epochSubjects;
-    summaryInfo.epochFilenames = epochFilenames;
-    summaryInfo.epochSegStatus = epochSegStatus;
-
-    % This allows data reading by the block, rather than by the entire epoch. 
-    summaryInfo.blockBeginSamps = zeros(1,numblocks);
-    summaryInfo.blockNumSamps = zeros(1,numblocks);
-    % Check that number of channels and sampling rate is consistent
-    % across blocks. 
-    for x = 0:numblocks-1
-        blockObj = blocks.get(x);
-        sampRate = double(blockObj.signalFrequency(1)); % 1 based
-        nChans = blockObj.numberOfSignals;
-        if sampRate ~= summaryInfo.sampRate
-            % Error: Inconsistent sampling rate. Should never occur.
-            % todo?: error handling
-        end
-        if nChans ~= summaryInfo.nChans
-            % Error: Inconsistent number of channels. Should never
-            % occur. todo?: error handling
-        end
-        
-        % This chunk of code allows data reading by the block, rather than by the entire epoch. 
-        % number of 4 byte floats is 1/4 the data block size
-        % That is divided by channel count to get data for each channel:
-        sampsTimesChans = blockObj.dataBlockSize/4;
-        nSamps = sampsTimesChans / nChans;
-%         summaryInfo.blockBeginSamps(x+1) = ;
-        summaryInfo.blockNumSamps(x+1) = nSamps;
-        if x ~= 0
-            summaryInfo.blockBeginSamps(x+1) = summaryInfo.blockBeginSamps(x) + summaryInfo.blockNumSamps(x);
-        end
-    end
+    blocksOrPibBlocks = blocks;
 else
-    % Error: Signal has 0 blocks. Should never occur. todo?: error
-    % handling
+    numblocks = pibBinObj.getNumberOfBlocks();
+    sampRate = double(pibBlocks.get(0).signalFrequency(1));
+    summaryInfo.sampRate = sampRate;
+    
+    blocksOrPibBlocks = pibBlocks;
+end
+
+assert(numblocks > 0);
+
+if ~isempty(pibBinObj)
+    summaryInfo.pibFilename = pibFilename;
+    pnsSetObj = mff_getObject(com.egi.services.mff.api.MFFResourceType.kMFF_RT_PNSSet, 'pnsSet.xml', filePath);
+    pnsSensors = pnsSetObj.getPNSSensors;
+    summaryInfo.pibNChans = pnsSensors.size;
+    pibBlockObj = pibBlocks.get(0);
+    summaryInfo.pibHasRef = false;
+    if pibBlockObj.numberOfSignals - summaryInfo.pibNChans == 1
+       summaryInfo.pibHasRef = true;
+    end
+end
+
+[epochType epochBeginSamps epochNumSamps epochFirstBlocks epochLastBlocks epochLabels epochTime0 multiSubj epochSubjects epochFilenames epochSegStatus] = getEpochInfos(filePath, sampRate);
+summaryInfo.epochType = epochType;
+summaryInfo.epochBeginSamps = epochBeginSamps;
+summaryInfo.epochNumSamps = epochNumSamps;
+summaryInfo.epochFirstBlocks = epochFirstBlocks;
+summaryInfo.epochLastBlocks = epochLastBlocks;
+summaryInfo.epochLabels = epochLabels;
+summaryInfo.epochTime0 = epochTime0;
+summaryInfo.multiSubj = multiSubj;
+summaryInfo.epochSubjects = epochSubjects;
+summaryInfo.epochFilenames = epochFilenames;
+summaryInfo.epochSegStatus = epochSegStatus;
+
+% This allows data reading by the block, rather than by the entire epoch. 
+summaryInfo.blockBeginSamps = zeros(1,numblocks);
+summaryInfo.blockNumSamps = zeros(1,numblocks);
+% Check that number of channels and sampling rate is consistent
+% across blocks.
+
+for x = 0:numblocks-1
+    blockObj = blocksOrPibBlocks.get(x);
+    sampRate = double(blockObj.signalFrequency(1)); % 1 based
+    nChans = blockObj.numberOfSignals;
+    if sampRate ~= summaryInfo.sampRate
+        % Error: Inconsistent sampling rate. Should never occur.
+        % todo?: error handling
+    end
+    if nChans ~= summaryInfo.nChans
+        % Error: Inconsistent number of channels. Should never
+        % occur. todo?: error handling
+    end
+
+    % This chunk of code allows data reading by the block, rather than by the entire epoch. 
+    % number of 4 byte floats is 1/4 the data block size
+    % That is divided by channel count to get data for each channel:
+    sampsTimesChans = blockObj.dataBlockSize/4;
+    nSamps = sampsTimesChans / nChans;
+%         summaryInfo.blockBeginSamps(x+1) = ;
+    summaryInfo.blockNumSamps(x+1) = nSamps;
+    if x ~= 0
+        summaryInfo.blockBeginSamps(x+1) = summaryInfo.blockBeginSamps(x) + summaryInfo.blockNumSamps(x);
+    end
 end
 
 % Returns the bin objects corresponding to the EEG, and PIB if it exists,
@@ -129,8 +139,13 @@ end
 function [pibBinObj pibBlocks pibSignalFile binObj blocks eegFile] = getSignalBlocks(mfffileObj, filePath)
 % eegFile = mff_getEEGFilename(mfffileObj, filePath);
 eegFile = mff_getSignalFilename(mfffileObj, filePath, com.egi.services.mff.api.InfoN.kEEG);
-binObj = mff_getObject(com.egi.services.mff.api.MFFResourceType.kMFF_RT_Signal, eegFile, filePath);
-blocks = binObj.getSignalBlocks();
+binObj = [];
+blocks = [];
+
+if ~isempty(eegFile)
+    binObj = mff_getObject(com.egi.services.mff.api.MFFResourceType.kMFF_RT_Signal, eegFile, filePath);
+    blocks = binObj.getSignalBlocks();
+end
 
 % pibSignalFile = mff_getPIBFilename(mfffileObj, filePath);
 pibSignalFile = mff_getSignalFilename(mfffileObj, filePath, com.egi.services.mff.api.InfoN.kPNSData);

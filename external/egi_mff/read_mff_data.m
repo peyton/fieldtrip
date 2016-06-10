@@ -62,16 +62,18 @@ data = zeros(eegNChans + pibNChans, dataNumSamples);
 % Call to function replaced by inline code for speed purposes. 
 % data(1:eegNChans,:) = read_mff_data_blocks(summaryInfo.binObj, summaryInfo.blocks, beginBlock, endBlock, eegNChans, dataNumSamples, summaryInfo.blockNumSamps);
 %%
-binObj = summaryInfo.javaObjs.binObj;
-blocks = summaryInfo.javaObjs.blocks;
-startChan = 1;
-endChan = eegNChans;
-sampleInd = 1;
-for blockInd = beginBlock-1:endBlock-1
-%     fprintf('blockInd %d\n', blockInd); %!!!
-    lastSampleInd = sampleInd + summaryInfo.blockNumSamps(blockInd+1) - 1;
-    data(startChan:endChan,sampleInd:lastSampleInd) = read_mff_data_block(binObj, blocks, blockInd);
-    sampleInd = lastSampleInd + 1;
+if ~isempty(summaryInfo.javaObjs.binObj)
+    binObj = summaryInfo.javaObjs.binObj;
+    blocks = summaryInfo.javaObjs.blocks;
+    startChan = 1;
+    endChan = eegNChans;
+    sampleInd = 1;
+    for blockInd = beginBlock-1:endBlock-1
+    %     fprintf('blockInd %d\n', blockInd); %!!!
+        lastSampleInd = sampleInd + summaryInfo.blockNumSamps(blockInd+1) - 1;
+        data(startChan:endChan,sampleInd:lastSampleInd) = read_mff_data_block(binObj, blocks, blockInd);
+        sampleInd = lastSampleInd + 1;
+    end
 end
 
 % PIB data if any...

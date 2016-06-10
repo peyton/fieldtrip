@@ -31,38 +31,39 @@ else
     header.nSamples = sum(summaryInfo.epochNumSamps);
     header.nTrials = 1;
 end
-% Add the sensor info. 
-sensorLayoutObj = mff_getObject(com.egi.services.mff.api.MFFResourceType.kMFF_RT_SensorLayout, 'sensorLayout.xml', filePath);
-sensors = sensorLayoutObj.getSensors();
+
 nChans = 0;
-for p = 1:sensors.size
-    sensorObj = sensors.get(p-1); % sensors 0 based
-    sensorType = sensorObj.getType;
-    if sensorType == 0 || sensorType == 1
-        tmpLabel = sensorObj.getName;
-        if strcmp(tmpLabel,'')
-            tmpLabel = sprintf('E%d', sensorObj.getNumber);
-        else
-            tmpLabel = char(tmpLabel);
+% Add the sensor info if it exists.
+sensorLayoutObj = mff_getObject(com.egi.services.mff.api.MFFResourceType.kMFF_RT_SensorLayout, 'sensorLayout.xml', filePath);
+if ~isempty(sensorLayoutObj)
+    sensors = sensorLayoutObj.getSensors();
+    for p = 1:sensors.size
+        sensorObj = sensors.get(p-1); % sensors 0 based
+        sensorType = sensorObj.getType;
+        if sensorType == 0 || sensorType == 1
+            tmpLabel = sensorObj.getName;
+            if strcmp(tmpLabel,'')
+                tmpLabel = sprintf('E%d', sensorObj.getNumber);
+            else
+                tmpLabel = char(tmpLabel);
+            end
+            header.label{p} = tmpLabel;
+            header.chantype{p} = 'eeg'; % hard-coded for now. 
+            header.chanunit{p} = 'uV'; % hard-coded for now. 
+            nChans = nChans + 1;
         end
-        header.label{p} = tmpLabel;
-        header.chantype{p} = 'eeg'; % hard-coded for now. 
-        header.chanunit{p} = 'uV'; % hard-coded for now. 
-        nChans = nChans + 1;
     end
 end
-if nChans ~= header.nChans
-    %Error. Should never occur. todo?: error handling
-end
+
 % Add the pib channel info. 
 if summaryInfo.pibNChans > 0
     pnsSetObj = mff_getObject(com.egi.services.mff.api.MFFResourceType.kMFF_RT_PNSSet, 'pnsSet.xml', filePath);
     pnsSensors = pnsSetObj.getPNSSensors;
     for p = 1:summaryInfo.pibNChans
-        tmpLabel = sprintf('pib%d', p);
-        header.label{nChans + p} = tmpLabel;
+        pnsSensorObj = pnsSensors.get(p - 1);
+        label = pnsSensorObj.getName();
+        header.label{nChans + p} = char(label);
         
-        pnsSensorObj = pnsSensors.get(p-1);
         header.chantype{nChans + p} = char(pnsSensorObj.getName);
         header.chanunit{nChans + p} = char(pnsSensorObj.getUnit);
     end
